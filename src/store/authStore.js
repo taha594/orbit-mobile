@@ -1,5 +1,6 @@
-import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
+import { create } from "zustand";
 
 export const useAuthStore = create((set) => ({
   user: null,
@@ -20,6 +21,7 @@ export const useAuthStore = create((set) => ({
     const userStr = await AsyncStorage.getItem("orbit_user");
     if (token && userStr) {
       set({ token, user: JSON.parse(userStr), isAuthenticated: true });
+      router.replace("/(tabs)/timesheet");
     }
   },
 }));

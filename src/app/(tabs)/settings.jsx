@@ -6,7 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  View
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 // import * as Notifications from "expo-notifications";
@@ -17,7 +17,10 @@ import { Colors } from "../../theme/colors";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const user = useAuthStore((state) => state.user);
+  const user = useAuthStore((state) => {
+    console.log("🚀 ~ SettingsScreen ~ user:", JSON.stringify(user));
+    return state.user;
+  });
   const [remindersEnabled, setRemindersEnabled] = useState(true);
   const router = useRouter();
 
@@ -76,19 +79,25 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.sectionLabel}>Profile</Text>
         <View style={styles.card}>
-          <ProfileRow label="Name" value={user?.name || "Muhammad Areeb"} />
+          <ProfileRow
+            label="Name"
+            value={
+              `${user?.user_metadata?.first_name} ${user?.user_metadata?.last_name}` ||
+              "User"
+            }
+          />
           <ProfileRow
             label="Email"
             value={user?.email || "areeb@example.com"}
           />
-          <ProfileRow
+          {/* <ProfileRow
             label="Department"
             value={user?.department || "Development"}
-          />
-          <ProfileRow
+          /> */}
+          {/* <ProfileRow
             label="Employee ID"
             value={user?.employeeId || "EMP-1024"}
-          />
+          /> */}
         </View>
 
         {/* <Text style={styles.sectionLabel}>Notifications</Text>

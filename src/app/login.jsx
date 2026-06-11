@@ -18,8 +18,8 @@ import { Colors } from "../theme/colors";
 export default function LoginScreen() {
   const router = useRouter();
   const loginStore = useAuthStore((state) => state.login);
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("taha@0degrees.io");
+  const [password, setPassword] = useState("Password@123");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 

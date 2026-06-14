@@ -3,7 +3,7 @@ import { Eye, EyeOff } from "lucide-react-native";
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  Keyboard,
   StyleSheet,
   Text,
   TextInput,
@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { Circle, Svg } from "react-native-svg";
+import Toast from "react-native-toast-message";
 import { mockApi } from "../api/mock";
 import { useAuthStore } from "../store/authStore";
 import { Colors } from "../theme/colors";
@@ -18,27 +19,44 @@ import { Colors } from "../theme/colors";
 export default function LoginScreen() {
   const router = useRouter();
   const loginStore = useAuthStore((state) => state.login);
-  const [username, setUsername] = useState("taha@0degrees.io");
-  const [password, setPassword] = useState("Password@123");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
+    Keyboard.dismiss();
+
     if (!username) {
-      return Alert.alert("Validation Error", "Email is required.");
+      Toast.show({
+        type: "info",
+        text1: "Please enter your email.",
+        position: "bottom",
+      });
+      return;
     }
 
     if (!password) {
-      return Alert.alert("Validation Error", "Password is required.");
+      Toast.show({
+        type: "info",
+        text1: "Please enter your password.",
+        position: "bottom",
+      });
+      return;
     }
 
     setLoading(true);
     try {
       const response = await mockApi.login(username, password);
       await loginStore(response.user, response.token);
+      Toast.show({
+        type: "success",
+        text1: "Successfully logged in! 👋",
+        position: "bottom",
+      });
       router.replace("/(tabs)/timesheet");
     } catch (error) {
-      console.error(error);
+      console.log("error: ", error);
     } finally {
       setLoading(false);
     }

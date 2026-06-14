@@ -1,8 +1,8 @@
-import React, { useEffect } from "react";
-import { View, Text, StyleSheet, Dimensions } from "react-native";
-import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { Svg, Circle, Defs, RadialGradient, Stop } from "react-native-svg";
+import { useRouter } from "expo-router";
+import { useEffect } from "react";
+import { Dimensions, StyleSheet, Text, View } from "react-native";
+import { Circle, Defs, RadialGradient, Stop, Svg } from "react-native-svg";
 
 const { width, height } = Dimensions.get("window");
 

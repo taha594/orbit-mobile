@@ -6,7 +6,13 @@ import BottomSheet, {
 import { format } from "date-fns";
 import { Calendar } from "lucide-react-native";
 import { useCallback, useMemo, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import DatePickerModal from "../components/DatePickerModal";
 import { Colors } from "../theme/colors";
 
@@ -14,6 +20,7 @@ export default function HalfDaySheet({ bottomSheetRef, onSubmit }) {
   const snapPoints = useMemo(() => ["60%"], []);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const todayStr = format(selectedDate, "EEEE, d MMM yyyy");
+  const [requestLoading, setRequestLoading] = useState(false);
 
   const [halfType, setHalfType] = useState("first");
   const [reason, setReason] = useState("");
@@ -31,9 +38,17 @@ export default function HalfDaySheet({ bottomSheetRef, onSubmit }) {
     [],
   );
 
-  const handleSubmit = () => {
-    onSubmit({ date: todayStr, halfType, reason });
-    bottomSheetRef.current?.close();
+  const handleSubmit = async () => {
+    try {
+      setRequestLoading(true);
+      await onSubmit({ date: todayStr, halfType, reason });
+      setRequestLoading(false);
+      bottomSheetRef.current?.close();
+    } catch (error) {
+      // Keep the bottom sheet open when submission fails.
+    } finally {
+      setRequestLoading(false);
+    }
   };
 
   return (
@@ -106,8 +121,13 @@ export default function HalfDaySheet({ bottomSheetRef, onSubmit }) {
           />
         </View>
 
-        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
+        <TouchableOpacity
+          disabled={requestLoading}
+          style={[styles.submitBtn, { opacity: requestLoading ? 0.8 : 1 }]}
+          onPress={handleSubmit}
+        >
           <Text style={styles.submitText}>Submit</Text>
+          {requestLoading && <ActivityIndicator color={"#fff"} />}
         </TouchableOpacity>
       </BottomSheetView>
     </BottomSheet>
@@ -178,8 +198,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginTop: 10,
+    flexDirection: "row",
   },
   submitText: {
+    marginRight: 10,
     color: "white",
     fontSize: 16,
     fontWeight: "600",

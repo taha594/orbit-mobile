@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { Calendar, ChevronDown } from "lucide-react-native";
 import { useCallback, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Modal,
   ScrollView,
@@ -74,6 +75,7 @@ function LeaveTypeModal({ visible, onClose, selectedValue, onSelect }) {
 
 export default function LeaveApplicationSheet({ bottomSheetRef, onSubmit }) {
   const snapPoints = useMemo(() => ["70%"], []);
+  const [requestLoading, setRequestLoading] = useState(false);
 
   const [leaveType, setLeaveType] = useState("Casual Leave");
   const [fromDate, setFromDate] = useState(new Date());
@@ -95,9 +97,17 @@ export default function LeaveApplicationSheet({ bottomSheetRef, onSubmit }) {
     [],
   );
 
-  const handleSubmit = () => {
-    onSubmit({ leaveType, fromDate, toDate, reason });
-    bottomSheetRef.current?.close();
+  const handleSubmit = async () => {
+    try {
+      setRequestLoading(true);
+      await onSubmit({ leaveType, fromDate, toDate, reason });
+      setRequestLoading(false);
+      bottomSheetRef.current?.close();
+    } catch (error) {
+      // Keep the bottom sheet open when submission fails.
+    } finally {
+      setRequestLoading(false);
+    }
   };
 
   return (
@@ -170,8 +180,13 @@ export default function LeaveApplicationSheet({ bottomSheetRef, onSubmit }) {
             />
           </View>
 
-          <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
+          <TouchableOpacity
+            disabled={requestLoading}
+            style={[styles.submitBtn, { opacity: requestLoading ? 0.8 : 1 }]}
+            onPress={handleSubmit}
+          >
             <Text style={styles.submitText}>Submit</Text>
+            {requestLoading && <ActivityIndicator color={"#fff"} />}
           </TouchableOpacity>
         </ScrollView>
       </BottomSheetView>
@@ -277,6 +292,7 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     height: 50,
+    flexDirection: "row",
     backgroundColor: Colors.primaryBlue,
     borderRadius: 10,
     justifyContent: "center",
@@ -284,6 +300,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   submitText: {
+    marginRight: 10,
     color: "white",
     fontSize: 16,
     fontWeight: "600",

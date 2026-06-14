@@ -1,17 +1,18 @@
-import React, { useMemo, useState } from "react";
+import { Filter } from "lucide-react-native";
+import { useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
+  ActivityIndicator,
   FlatList,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Filter } from "lucide-react-native";
-import { Colors } from "../../theme/colors";
-import { useRequestStore } from "../../store/requestStore";
 import RequestCard from "../../components/RequestCard";
+import { useQuickActions } from "../../hooks/useQuickActions";
+import { Colors } from "../../theme/colors";
 
 const filters = [
   { id: "all", label: "All" },
@@ -24,10 +25,7 @@ const filters = [
 export default function RequestsScreen() {
   const insets = useSafeAreaInsets();
   const [activeFilter, setActiveFilter] = useState("all");
-  const filterRequests = useRequestStore((state) => state.filterRequests);
-  // const requests = filterRequests(activeFilter);
-
-  const requests = useRequestStore((state) => state.requests);
+  const { requests, requestsLoading, requestsError } = useQuickActions();
 
   const filteredRequests = useMemo(() => {
     if (activeFilter === "all") return requests;
@@ -78,13 +76,24 @@ export default function RequestsScreen() {
         </ScrollView>
       </View>
 
-      <FlatList
-        data={filteredRequests}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <RequestCard request={item} />}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {requestsLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primaryBlue} />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredRequests}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <RequestCard request={item} />}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No requests found.</Text>
+            </View>
+          )}
+        />
+      )}
     </View>
   );
 }
@@ -136,5 +145,30 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 16,
     paddingBottom: 40,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 24,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  errorText: {
+    color: Colors.danger || "#c53030",
+    fontSize: 16,
+    textAlign: "center",
+  },
+  emptyContainer: {
+    paddingTop: 40,
+    alignItems: "center",
+  },
+  emptyText: {
+    color: Colors.textSecondary,
+    fontSize: 16,
   },
 });

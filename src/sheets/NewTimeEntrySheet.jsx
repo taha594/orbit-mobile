@@ -6,6 +6,8 @@ import BottomSheet, {
 import { ChevronDown, Clock } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -15,9 +17,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { get, post } from "../api/client";
+import { useAuthStore } from "../store/authStore";
 import { Colors } from "../theme/colors";
 
-const projectOptions = [
+const defaultProjectOptions = [
   { label: "Client Website", value: "Client Website" },
   { label: "Marketing Campaign", value: "Marketing Campaign" },
   { label: "Internal Tools", value: "Internal Tools" },
@@ -99,15 +103,21 @@ export default function NewTimeEntrySheet({
   bottomSheetRef,
   onSave,
   initialValues,
+  projectOptions = [],
+  entryDate,
 }) {
   const snapPoints = useMemo(() => ["65%"], []);
 
+  const [projectId, setProjectId] = useState("");
   const [project, setProject] = useState("");
   const [task, setTask] = useState("");
+  const [taskId, setTaskId] = useState("");
   const [notes, setNotes] = useState("");
   const [hours, setHours] = useState("1:00");
+  const [projectTaskOptions, setProjectTaskOptions] = useState([]);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
   const [showTaskPicker, setShowTaskPicker] = useState(false);
+  const [requestLoading, setRequestLoading] = useState(false);
 
   const formatDuration = (minutes) => {
     const hoursValue = Math.floor(minutes / 60);
@@ -117,20 +127,60 @@ export default function NewTimeEntrySheet({
 
   useEffect(() => {
     if (initialValues) {
-      setProject(initialValues.project || "");
+      const selectedProject = projectOptions.find(
+        (option) =>
+          option.label === initialValues.project ||
+          option.value === initialValues.project,
+      );
+      setProjectId(selectedProject?.value || "");
+      setProject(initialValues.project || selectedProject?.label || "");
       setTask(initialValues.task || "");
+      setTaskId(initialValues.taskId || "");
       setNotes(initialValues.notes || "");
       setHours(
         initialValues.hours ||
           formatDuration(initialValues.durationMinutes || 0),
       );
     } else {
+      setProjectId("");
       setProject("");
       setTask("");
+      setTaskId("");
       setNotes("");
       setHours("1:00");
+      setProjectTaskOptions([]);
     }
-  }, [initialValues]);
+  }, [initialValues, projectOptions]);
+
+  useEffect(() => {
+    const loadProjectTasks = async () => {
+      if (!projectId) {
+        setProjectTaskOptions([]);
+        return;
+      }
+
+      try {
+        const response = await get(
+          `/rest/v1/project_tasks?select=is_billable,task:tasks(id,name,project_id,is_active)&project_id=eq.${projectId}&is_active=eq.true`,
+        );
+
+        setProjectTaskOptions(
+          response
+            .filter((item) => item.task?.id)
+            .map((item) => ({
+              label: item.task.name,
+              value: item.task.id,
+              isBillable: item.is_billable,
+            })),
+        );
+      } catch (error) {
+        console.error("Failed to load project tasks", error);
+        setProjectTaskOptions([]);
+      }
+    };
+
+    loadProjectTasks();
+  }, [projectId]);
 
   const renderBackdrop = useCallback(
     (props) => (
@@ -145,16 +195,76 @@ export default function NewTimeEntrySheet({
   );
 
   const isEditing = Boolean(initialValues);
+  const user = useAuthStore((state) => state.user);
 
-  const handleSave = () => {
-    onSave({
-      id: initialValues?.id,
-      project,
-      task,
-      notes,
-      hours,
-    });
-    bottomSheetRef.current?.close();
+  const handleSave = async () => {
+    const employeeId = user?.employee?.id;
+    console.log("🚀 ~ handleSave ~ user:", JSON.stringify(user));
+    const organizationId = user?.employee?.organization_id;
+    const durationMinutes = Number(
+      hours
+        .split(":")
+        .reduce(
+          (acc, segment, index) =>
+            index === 0 ? Number(segment) * 60 : acc + Number(segment),
+          0,
+        ),
+    );
+
+    console.log("===> ", employeeId, organizationId, projectId, taskId);
+
+    if (!employeeId || !projectId || !taskId || !entryDate || !organizationId) {
+      Alert.alert(
+        "Cannot save entry",
+        "Missing required employee, project, task, date, or organization values.",
+      );
+      return;
+    }
+
+    setRequestLoading(true);
+
+    try {
+      const payload = {
+        employee_id: employeeId,
+        project_id: projectId,
+        task_id: taskId,
+        entry_date: entryDate,
+        duration_minutes: durationMinutes,
+        description: notes || null,
+        status: "draft",
+        organization_id: organizationId,
+      };
+
+      const response = await post(
+        "/rest/v1/timesheet_entries?select=id",
+        payload,
+      );
+
+      const returnedId = Array.isArray(response)
+        ? response[0]?.id
+        : response?.id;
+      const savedId = initialValues?.id || returnedId;
+
+      onSave({
+        id: savedId,
+        project,
+        projectId,
+        task,
+        taskId,
+        notes,
+        hours,
+        durationMinutes,
+      });
+      setRequestLoading(false);
+
+      bottomSheetRef.current?.close();
+    } catch (error) {
+      console.error("Failed to save time entry", error);
+      Alert.alert(
+        "Save failed",
+        error?.message || "Unable to save the time entry.",
+      );
+    }
   };
 
   return (
@@ -212,18 +322,36 @@ export default function NewTimeEntrySheet({
             visible={showProjectPicker}
             onClose={() => setShowProjectPicker(false)}
             title="Select Project"
-            options={projectOptions}
-            selectedValue={project}
-            onSelect={setProject}
+            options={
+              projectOptions.length > 0 ? projectOptions : defaultProjectOptions
+            }
+            selectedValue={projectId || project}
+            onSelect={(value) => {
+              const selectedProject =
+                projectOptions.find((option) => option.value === value) ||
+                defaultProjectOptions.find((option) => option.value === value);
+              setProjectId(value);
+              setProject(selectedProject?.label || value);
+              setTask("");
+              setTaskId("");
+            }}
           />
 
           <DropdownModal
             visible={showTaskPicker}
             onClose={() => setShowTaskPicker(false)}
             title="Select Task"
-            options={taskOptions}
-            selectedValue={task}
-            onSelect={setTask}
+            options={
+              projectTaskOptions.length > 0 ? projectTaskOptions : taskOptions
+            }
+            selectedValue={taskId || task}
+            onSelect={(value) => {
+              const selectedTask =
+                projectTaskOptions.find((option) => option.value === value) ||
+                taskOptions.find((option) => option.value === value);
+              setTaskId(value);
+              setTask(selectedTask?.label || value);
+            }}
           />
 
           <View style={styles.field}>
@@ -273,10 +401,15 @@ export default function NewTimeEntrySheet({
             </View>
           </View>
 
-          <TouchableOpacity style={styles.submitBtn} onPress={handleSave}>
+          <TouchableOpacity
+            disabled={requestLoading}
+            style={[styles.submitBtn, { opacity: requestLoading ? 0.8 : 1 }]}
+            onPress={handleSave}
+          >
             <Text style={styles.submitText}>
               {isEditing ? "Update Entry" : "Save Entry"}
             </Text>
+            {requestLoading && <ActivityIndicator color={"#fff"} />}
           </TouchableOpacity>
         </KeyboardAvoidingView>
       </BottomSheetView>
@@ -402,8 +535,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginTop: 10,
+    flexDirection: "row",
   },
   submitText: {
+    marginRight: 10,
     color: "white",
     fontSize: 16,
     fontWeight: "600",

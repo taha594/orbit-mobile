@@ -7,6 +7,7 @@ import { addMinutes, format } from "date-fns";
 import { Calendar, Clock, X } from "lucide-react-native";
 import { useCallback, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -198,6 +199,8 @@ export default function RunningLateSheet({ bottomSheetRef, onSubmit }) {
   const snapPoints = useMemo(() => ["55%"], []);
   const todayStr = format(new Date(), "EEEE, d MMM yyyy");
 
+  const [requestLoading, setRequestLoading] = useState(false);
+
   const [expectedTime, setExpectedTime] = useState(addMinutes(new Date(), 30));
   const [reason, setReason] = useState("");
   const [showPicker, setShowPicker] = useState(false);
@@ -214,13 +217,20 @@ export default function RunningLateSheet({ bottomSheetRef, onSubmit }) {
     [],
   );
 
-  const handleSubmit = () => {
-    onSubmit({
-      date: todayStr,
-      expectedArrival: format(expectedTime, "p"),
-      reason,
-    });
-    bottomSheetRef.current?.close();
+  const handleSubmit = async () => {
+    try {
+      setRequestLoading(true);
+      await onSubmit({
+        date: todayStr,
+        expectedArrival: format(expectedTime, "p"),
+        reason,
+      });
+      setRequestLoading(false);
+      bottomSheetRef.current?.close();
+    } catch (error) {
+      // Keep the bottom sheet open so the user can correct duplicate submissions.
+      setRequestLoading(false);
+    }
   };
 
   return (
@@ -276,8 +286,13 @@ export default function RunningLateSheet({ bottomSheetRef, onSubmit }) {
             />
           </View>
 
-          <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
+          <TouchableOpacity
+            disabled={requestLoading}
+            style={[styles.submitBtn, { opacity: requestLoading ? 0.8 : 1 }]}
+            onPress={handleSubmit}
+          >
             <Text style={styles.submitText}>Submit</Text>
+            {requestLoading && <ActivityIndicator color={"#fff"} />}
           </TouchableOpacity>
         </KeyboardAvoidingView>
       </BottomSheetView>
@@ -330,6 +345,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   submitBtn: {
+    flexDirection: "row",
     height: 50,
     backgroundColor: Colors.primaryBlue,
     borderRadius: 10,
@@ -341,5 +357,6 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "600",
+    marginRight: 10,
   },
 });

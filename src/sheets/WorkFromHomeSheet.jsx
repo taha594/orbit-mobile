@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { Calendar } from "lucide-react-native";
 import { useCallback, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -19,6 +20,7 @@ import { Colors } from "../theme/colors";
 export default function WorkFromHomeSheet({ bottomSheetRef, onSubmit }) {
   const snapPoints = useMemo(() => ["50%"], []);
   const todayStr = format(new Date(), "EEEE, d MMM yyyy");
+  const [requestLoading, setRequestLoading] = useState(false);
 
   const [reason, setReason] = useState("");
 
@@ -34,9 +36,17 @@ export default function WorkFromHomeSheet({ bottomSheetRef, onSubmit }) {
     [],
   );
 
-  const handleSubmit = () => {
-    onSubmit({ date: todayStr, reason });
-    bottomSheetRef.current?.close();
+  const handleSubmit = async () => {
+    try {
+      setRequestLoading(true);
+      await onSubmit({ date: todayStr, reason });
+      setRequestLoading(false);
+      bottomSheetRef.current?.close();
+    } catch (error) {
+      // Keep the bottom sheet open when submission fails.
+    } finally {
+      setRequestLoading(false);
+    }
   };
 
   return (
@@ -73,8 +83,13 @@ export default function WorkFromHomeSheet({ bottomSheetRef, onSubmit }) {
             />
           </View>
 
-          <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
+          <TouchableOpacity
+            disabled={requestLoading}
+            style={[styles.submitBtn, { opacity: requestLoading ? 0.8 : 1 }]}
+            onPress={handleSubmit}
+          >
             <Text style={styles.submitText}>Submit</Text>
+            {requestLoading && <ActivityIndicator color={"#fff"} />}
           </TouchableOpacity>
         </KeyboardAvoidingView>
       </BottomSheetView>
@@ -121,6 +136,7 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     height: 50,
+    flexDirection: "row",
     backgroundColor: Colors.primaryBlue,
     borderRadius: 10,
     justifyContent: "center",
@@ -129,6 +145,7 @@ const styles = StyleSheet.create({
   },
   submitText: {
     color: "white",
+    marginRight: 10,
     fontSize: 16,
     fontWeight: "600",
   },

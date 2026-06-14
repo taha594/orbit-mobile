@@ -12,6 +12,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Toast from "react-native-toast-message";
+import { get } from "../../api/client";
 import { mockApi } from "../../api/mock";
 import CircularProgress from "../../components/CircularProgress";
 import DateNavigator from "../../components/DateNavigator";
@@ -22,6 +24,7 @@ import LeaveApplicationSheet from "../../sheets/LeaveApplicationSheet";
 import NewTimeEntrySheet from "../../sheets/NewTimeEntrySheet";
 import RunningLateSheet from "../../sheets/RunningLateSheet";
 import WorkFromHomeSheet from "../../sheets/WorkFromHomeSheet";
+import { useAuthStore } from "../../store/authStore";
 import { useRequestStore } from "../../store/requestStore";
 import { useTimesheetStore } from "../../store/timesheetStore";
 import { Colors } from "../../theme/colors";
@@ -67,6 +70,7 @@ export default function TimesheetScreen() {
     deleteEntry,
   } = useTimesheetStore();
   const addRequest = useRequestStore((state) => state.addRequest);
+  const user = useAuthStore((state) => state.user);
 
   const [fabOpen, setFabOpen] = useState(false);
   const [activeSheet, setActiveSheet] = useState(null);
@@ -79,10 +83,16 @@ export default function TimesheetScreen() {
   const newEntryRef = useRef(null);
 
   const dateKey = format(selectedDate, "yyyy-MM-dd");
+  const [projectOptions, setProjectOptions] = useState([]);
 
+  const employeeId = user?.employee?.id;
   const { data: fetchedEntries, isLoading } = useQuery({
-    queryKey: ["entries", dateKey],
-    queryFn: () => mockApi.getTimeEntries(dateKey),
+    queryKey: ["entries", dateKey, employeeId],
+    queryFn: async () => {
+      if (!employeeId) return [];
+      return mockApi.getTimeEntries(dateKey, employeeId);
+    },
+    enabled: !!employeeId,
   });
 
   useEffect(() => {
@@ -90,6 +100,49 @@ export default function TimesheetScreen() {
       setEntries(fetchedEntries);
     }
   }, [fetchedEntries]);
+
+  const loadAssignedProjects = async (employeeId) => {
+    if (!employeeId) {
+      setProjectOptions([]);
+      return;
+    }
+
+    try {
+      const assignmentResponse = await get(
+        `/rest/v1/project_team_members?select=project_id&employee_id=eq.${encodeURIComponent(
+          employeeId,
+        )}&is_assigned=eq.true`,
+      );
+      const projectIds = [
+        ...new Set(
+          assignmentResponse.map((item) => item.project_id).filter(Boolean),
+        ),
+      ];
+
+      if (projectIds.length === 0) {
+        setProjectOptions([]);
+        return;
+      }
+
+      const projectsResponse = await get(
+        `/rest/v1/projects?select=*,client:clients(id,name,status)&is_active=eq.true&id=in.(${projectIds.join(",")})&order=name.asc`,
+      );
+
+      setProjectOptions(
+        projectsResponse.map((project) => ({
+          label: project.name,
+          value: project.id,
+        })),
+      );
+    } catch (error) {
+      console.error("Failed to load assigned projects", error);
+      setProjectOptions([]);
+    }
+  };
+
+  useEffect(() => {
+    loadAssignedProjects(user?.employee?.id);
+  }, [user?.employee?.id]);
 
   const stats = useMemo(
     () => getTotalHoursForDate(selectedDate),
@@ -110,11 +163,27 @@ export default function TimesheetScreen() {
   };
 
   const handleEditEntry = (entry) => {
+    Toast.show({
+      type: "info",
+      text1: "Edit feature coming soon!",
+      text2: "This feature is under development. Stay tuned for updates!",
+      position: "bottom",
+    });
+    return;
     setEditEntry(entry);
     newEntryRef.current?.expand();
   };
 
   const handleDeleteEntry = (entry) => {
+    Toast.show({
+      type: "info",
+      text1: "Delete feature coming soon!",
+      text2: "This feature is under development. Stay tuned for updates!",
+      position: "bottom",
+    });
+    return;
+
+    return;
     Alert.alert(
       "Delete time entry",
       "Are you sure you want to delete this entry?",
@@ -129,16 +198,33 @@ export default function TimesheetScreen() {
     );
   };
 
-  const handleRequestSubmit = (type, data) => {
+  const handleRequestSubmit = async (type, data) => {
     const newRequest = {
       id: Math.random().toString(),
       type,
+      userId: user?.id || null,
       date: dateKey,
       submittedAt: new Date().toISOString(),
       status: "pending",
       details: data,
     };
-    addRequest(newRequest);
+
+    try {
+      await addRequest(newRequest);
+      Toast.show({
+        type: "success",
+        text1: "Request submitted successfully",
+        text2: `Your ${type.replace("_", " ")} request has been submitted.`,
+        position: "bottom",
+      });
+    } catch (error) {
+      Toast.show({
+        type: "info",
+        text1: "Oops! ",
+        text2: error.message || "Failed to submit request.",
+        position: "bottom",
+      });
+    }
   };
 
   return (
@@ -218,11 +304,11 @@ export default function TimesheetScreen() {
             </View>
           )}
 
-          {entries.length > 0 && (
+          {/* {entries.length > 0 && (
             <TouchableOpacity style={styles.submitBtn}>
               <Text style={styles.submitBtnText}>Submit Timesheet</Text>
             </TouchableOpacity>
-          )}
+          )} */}
 
           {/* Spacer for FAB */}
           <View style={{ height: 100 }} />
@@ -254,6 +340,8 @@ export default function TimesheetScreen() {
       <NewTimeEntrySheet
         bottomSheetRef={newEntryRef}
         initialValues={editEntry}
+        projectOptions={projectOptions}
+        entryDate={dateKey}
         onSave={(data) => {
           const updatedEntry = {
             id: data.id || Math.random().toString(),

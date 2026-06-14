@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
+import Toast from "react-native-toast-message";
 
 const API_BASE_URL = "https://fvzbdiysdtnxhbrjciiq.supabase.co";
 const API_KEY =
@@ -43,8 +44,11 @@ export const post = async (url, data, config) => {
   } catch (error) {
     console.log("STATUS", error.response?.status);
     console.log("DATA", error.response?.data);
-
-    console.error("Error in POST request:", error);
+    Toast.show({
+      type: "error",
+      text1: error.response?.data?.msg,
+      position: "bottom",
+    });
     throw error;
   }
 };

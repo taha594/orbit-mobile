@@ -14,10 +14,7 @@ export const mockApi = {
       token: response.access_token,
     };
   },
-  getTimeEntries: async (
-    date,
-    employeeId = "cc4cbd74-2c21-4b6f-9a4d-57606afde175",
-  ) => {
+  getTimeEntries: async (date, employeeId) => {
     const select =
       "*,project:projects(id,name,is_active,end_date,client:clients(id,name)),task:tasks(id,name)";
     const query = `select=${encodeURIComponent(select)}&employee_id=eq.${encodeURIComponent(

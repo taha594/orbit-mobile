@@ -1,13 +1,12 @@
-import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { format } from "date-fns";
 import {
+  Calendar,
+  ChevronRight,
   Clock,
   Home,
-  Calendar,
   Sunset,
-  ChevronRight,
 } from "lucide-react-native";
-import { format } from "date-fns";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Colors } from "../theme/colors";
 
 const icons = {
@@ -15,6 +14,14 @@ const icons = {
   wfh: { icon: Home, bg: Colors.successGreen },
   leave: { icon: Calendar, bg: Colors.dangerRed },
   half_day: { icon: Sunset, bg: Colors.purple },
+};
+
+const parseRequestDate = (value) => {
+  if (!value) return null;
+  if (typeof value.toDate === "function") return value.toDate();
+  if (value.seconds != null) return new Date(value.seconds * 1000);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 };
 
 export default function RequestCard({ request }) {
@@ -28,8 +35,13 @@ export default function RequestCard({ request }) {
   let detail = "";
   if (request.type === "running_late")
     detail = `Expected: ${request.details.expectedArrival}`;
-  if (request.type === "leave")
-    detail = `${format(new Date(request.details.fromDate), "d MMM")} - ${format(new Date(request.details.toDate), "d MMM")}`;
+  if (request.type === "leave") {
+    const fromDate = parseRequestDate(request.details.fromDate);
+    const toDate = parseRequestDate(request.details.toDate);
+    if (fromDate && toDate) {
+      detail = `${format(fromDate, "d MMM")} - ${format(toDate, "d MMM")}`;
+    }
+  }
   if (request.type === "half_day")
     detail = `${request.details.halfType === "first" ? "First Half" : "Second Half"}`;
 

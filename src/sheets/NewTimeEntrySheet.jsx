@@ -8,15 +8,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   KeyboardAvoidingView,
-  Modal,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { ScrollView } from "react-native-gesture-handler";
 import { get, post } from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { Colors } from "../theme/colors";
@@ -53,49 +53,45 @@ function DropdownModal({
   selectedValue,
   onSelect,
 }) {
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.modalOverlay}>
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={onClose}
-        />
-        <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>{title}</Text>
-          <FlatList
-            data={options}
-            keyExtractor={(item) => item.value}
-            style={styles.modalList}
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => {
-              const selected = item.value === selectedValue;
-              return (
-                <TouchableOpacity
-                  style={[
-                    styles.modalOption,
-                    selected && styles.modalOptionSelected,
-                  ]}
-                  onPress={() => {
-                    onSelect(item.value);
-                    onClose();
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.modalOptionText,
-                      selected && styles.modalOptionTextSelected,
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }}
-          />
-        </View>
-      </View>
-    </Modal>
+    <View style={styles.dropdownContainer}>
+      <Text style={styles.dropdownTitle}>{title}</Text>
+      <ScrollView
+        style={styles.dropdownList}
+        contentContainerStyle={styles.dropdownContent}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
+      >
+        {options.map((item) => {
+          const selected = item.value === selectedValue;
+          return (
+            <Pressable
+              key={item.value}
+              style={[
+                styles.dropdownOption,
+                selected && styles.dropdownOptionSelected,
+              ]}
+              onPress={() => {
+                onSelect(item.value);
+                onClose();
+              }}
+            >
+              <Text
+                style={[
+                  styles.dropdownOptionText,
+                  selected && styles.dropdownOptionTextSelected,
+                ]}
+              >
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -106,7 +102,7 @@ export default function NewTimeEntrySheet({
   projectOptions = [],
   entryDate,
 }) {
-  const snapPoints = useMemo(() => ["65%"], []);
+  const snapPoints = useMemo(() => ["33%"], []);
 
   const [projectId, setProjectId] = useState("");
   const [project, setProject] = useState("");
@@ -211,8 +207,6 @@ export default function NewTimeEntrySheet({
         ),
     );
 
-    console.log("===> ", employeeId, organizationId, projectId, taskId);
-
     if (!employeeId || !projectId || !taskId || !entryDate || !organizationId) {
       Alert.alert(
         "Cannot save entry",
@@ -275,7 +269,7 @@ export default function NewTimeEntrySheet({
       enablePanDownToClose
       backdropComponent={renderBackdrop}
     >
-      <BottomSheetView style={styles.container}>
+      <BottomSheetView style={[styles.container, styles.bottomSheetView]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
@@ -285,85 +279,101 @@ export default function NewTimeEntrySheet({
 
           <View style={styles.field}>
             <Text style={styles.label}>Project</Text>
-            <TouchableOpacity
-              style={styles.inputContainer}
-              onPress={() => setShowProjectPicker(true)}
-              activeOpacity={0.8}
+            <View
+              style={[
+                styles.dropdownWrapper,
+                showProjectPicker && styles.dropdownWrapperOpen,
+              ]}
             >
-              <Text
-                style={[
-                  styles.inputText,
-                  !project && { color: Colors.textMuted },
-                ]}
+              <TouchableOpacity
+                style={styles.inputContainer}
+                onPress={() => {
+                  setShowTaskPicker(false);
+                  setShowProjectPicker((prev) => !prev);
+                }}
+                activeOpacity={0.8}
               >
-                {project || "Select project"}
-              </Text>
-              <ChevronDown size={18} color={Colors.textMuted} />
-            </TouchableOpacity>
+                <Text
+                  style={[
+                    styles.inputText,
+                    !project && { color: Colors.textMuted },
+                  ]}
+                >
+                  {project || "Select project"}
+                </Text>
+                <ChevronDown size={18} color={Colors.textMuted} />
+              </TouchableOpacity>
+              <DropdownModal
+                visible={showProjectPicker}
+                onClose={() => setShowProjectPicker(false)}
+                title="Select Project"
+                options={
+                  projectOptions.length > 0
+                    ? projectOptions
+                    : defaultProjectOptions
+                }
+                selectedValue={projectId || project}
+                onSelect={(value) => {
+                  const selectedProject =
+                    projectOptions.find((option) => option.value === value) ||
+                    defaultProjectOptions.find(
+                      (option) => option.value === value,
+                    );
+                  setProjectId(value);
+                  setProject(selectedProject?.label || value);
+                  setTask("");
+                  setTaskId("");
+                }}
+              />
+            </View>
           </View>
 
           <View style={styles.field}>
             <Text style={styles.label}>Task</Text>
-            <TouchableOpacity
-              style={styles.inputContainer}
-              onPress={() => setShowTaskPicker(true)}
-              activeOpacity={0.8}
+            <View
+              style={[
+                styles.dropdownWrapper,
+                showTaskPicker && styles.dropdownWrapperOpen,
+              ]}
             >
-              <Text
-                style={[styles.inputText, !task && { color: Colors.textMuted }]}
+              <TouchableOpacity
+                style={styles.inputContainer}
+                onPress={() => {
+                  setShowProjectPicker(false);
+                  setShowTaskPicker((prev) => !prev);
+                }}
+                activeOpacity={0.8}
               >
-                {task || "Select task"}
-              </Text>
-              <ChevronDown size={18} color={Colors.textMuted} />
-            </TouchableOpacity>
-          </View>
-
-          <DropdownModal
-            visible={showProjectPicker}
-            onClose={() => setShowProjectPicker(false)}
-            title="Select Project"
-            options={
-              projectOptions.length > 0 ? projectOptions : defaultProjectOptions
-            }
-            selectedValue={projectId || project}
-            onSelect={(value) => {
-              const selectedProject =
-                projectOptions.find((option) => option.value === value) ||
-                defaultProjectOptions.find((option) => option.value === value);
-              setProjectId(value);
-              setProject(selectedProject?.label || value);
-              setTask("");
-              setTaskId("");
-            }}
-          />
-
-          <DropdownModal
-            visible={showTaskPicker}
-            onClose={() => setShowTaskPicker(false)}
-            title="Select Task"
-            options={
-              projectTaskOptions.length > 0 ? projectTaskOptions : taskOptions
-            }
-            selectedValue={taskId || task}
-            onSelect={(value) => {
-              const selectedTask =
-                projectTaskOptions.find((option) => option.value === value) ||
-                taskOptions.find((option) => option.value === value);
-              setTaskId(value);
-              setTask(selectedTask?.label || value);
-            }}
-          />
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Notes</Text>
-            <BottomSheetTextInput
-              style={[styles.inputContainer, styles.multiline]}
-              placeholder="What did you work on?"
-              placeholderTextColor={Colors.textMuted}
-              multiline
-              value={notes}
-              onChangeText={setNotes}
-            />
+                <Text
+                  style={[
+                    styles.inputText,
+                    !task && { color: Colors.textMuted },
+                  ]}
+                >
+                  {task || "Select task"}
+                </Text>
+                <ChevronDown size={18} color={Colors.textMuted} />
+              </TouchableOpacity>
+              <DropdownModal
+                visible={showTaskPicker}
+                onClose={() => setShowTaskPicker(false)}
+                title="Select Task"
+                options={
+                  projectTaskOptions.length > 0
+                    ? projectTaskOptions
+                    : taskOptions
+                }
+                selectedValue={taskId || task}
+                onSelect={(value) => {
+                  const selectedTask =
+                    projectTaskOptions.find(
+                      (option) => option.value === value,
+                    ) || taskOptions.find((option) => option.value === value);
+                  setTaskId(value);
+                  setTask(selectedTask?.label || value);
+                }}
+              />
+            </View>
           </View>
 
           <View style={styles.field}>
@@ -401,6 +411,18 @@ export default function NewTimeEntrySheet({
             </View>
           </View>
 
+          <View style={styles.field}>
+            <Text style={styles.label}>Notes</Text>
+            <BottomSheetTextInput
+              style={[styles.inputContainer, styles.multiline]}
+              placeholder="What did you work on?"
+              placeholderTextColor={Colors.textMuted}
+              multiline
+              value={notes}
+              onChangeText={setNotes}
+            />
+          </View>
+
           <TouchableOpacity
             disabled={requestLoading}
             style={[styles.submitBtn, { opacity: requestLoading ? 0.8 : 1 }]}
@@ -420,6 +442,7 @@ export default function NewTimeEntrySheet({
 const styles = StyleSheet.create({
   container: {
     padding: 20,
+    overflow: "visible",
   },
   title: {
     fontSize: 18,
@@ -429,6 +452,7 @@ const styles = StyleSheet.create({
   },
   field: {
     marginBottom: 16,
+    overflow: "visible",
   },
   label: {
     fontSize: 13,
@@ -444,6 +468,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 12,
     justifyContent: "space-between",
+  },
+  bottomSheetView: {
+    overflow: "visible",
+  },
+  dropdownWrapper: {
+    position: "relative",
+    zIndex: 999,
+    overflow: "visible",
   },
   inputContainerWide: {
     minHeight: 48,
@@ -480,46 +512,54 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textPrimary,
   },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
+  dropdownWrapperOpen: {
+    zIndex: 1100,
   },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    flex: 1,
-  },
-  modalContainer: {
+  dropdownContainer: {
+    position: "absolute",
+    top: 56,
+    left: 0,
+    right: 0,
     backgroundColor: Colors.surfaceWhite,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
-    maxHeight: "50%",
+    borderRadius: 16,
+    padding: 12,
+    maxHeight: 360,
+    borderWidth: 1,
+    borderColor: Colors.inputBorder || "#E5E7EB",
+    zIndex: 999,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 10,
   },
-  modalTitle: {
-    fontSize: 16,
+  dropdownTitle: {
+    fontSize: 14,
     fontWeight: "600",
     color: Colors.textPrimary,
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  modalList: {
-    maxHeight: 240,
+  dropdownList: {
+    maxHeight: 200,
   },
-  modalOption: {
+  dropdownContent: {
+    paddingBottom: 0,
+  },
+  dropdownOption: {
     paddingVertical: 14,
     paddingHorizontal: 12,
     borderRadius: 10,
     backgroundColor: Colors.inputBg,
     marginBottom: 8,
   },
-  modalOptionSelected: {
+  dropdownOptionSelected: {
     backgroundColor: Colors.primaryBlue,
   },
-  modalOptionText: {
+  dropdownOptionText: {
     fontSize: 15,
     color: Colors.textPrimary,
   },
-  modalOptionTextSelected: {
+  dropdownOptionTextSelected: {
     color: "white",
     fontWeight: "600",
   },
